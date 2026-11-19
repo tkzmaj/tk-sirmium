@@ -19,7 +19,7 @@
 <div id="login"><label for="email">Email</label><input id="email" type="email" autocomplete="username"><label for="password">Lozinka</label><input id="password" type="password" autocomplete="current-password"><p><button class="primary" id="login-btn">Prijavi se</button></p></div>
 <div id="admin-tools" class="hidden"><p class="success">✅ Prijavljen administrator</p><button id="logout-btn">Odjavi se</button>
 <h2 style="margin-top:24px">👤 Dodaj igrača</h2><label for="new-player">Ime i prezime</label><input id="new-player" placeholder="Ime i prezime igrača"><label for="new-league">Liga</label><select id="new-league"><option value="A">A liga</option><option value="B">B liga</option></select><p><button class="primary" id="add-player-btn">Dodaj igrača</button></p>
-<h2 style="margin-top:28px">🗑️ Upravljanje igračima</h2><p class="muted">Možeš obrisati igrače bez sačuvanih mečeva.</p><div id="admin-players"></div>
+<h2 style="margin-top:28px">🗑️ Upravljanje igračima</h2><p class="muted">Brisanje igrača briše i sve njegove mečeve i njihove rezultate. Ova radnja se ne može poništiti.</p><div id="admin-players"></div>
 <h2 style="margin-top:28px">🎾 Dodaj rezultat</h2><div class="grid"><div><label for="p1">Prvi igrač</label><select id="p1"></select></div><div><label for="p2">Drugi igrač</label><select id="p2"></select></div><div><label for="s1">Setovi prvog igrača</label><input id="s1" type="number" min="0" max="5" value="2"></div><div><label for="s2">Setovi drugog igrača</label><input id="s2" type="number" min="0" max="5" value="0"></div></div><p><button class="primary" id="save-btn">Sačuvaj meč</button></p></div>
 <p id="admin-message" class="notice" role="status"></p></section>
 </main>
@@ -45,7 +45,7 @@ function render(){
  const options=players.map(p=>`<option value="${safe(p.id)}">${safe(p.name)} (${safe(p.league)})</option>`).join('');el('p1').innerHTML=options;el('p2').innerHTML=options;if(players.length>1)el('p2').selectedIndex=1;
  renderAdminPlayers();
 }
-function renderAdminPlayers(){const container=el('admin-players');if(!isAdmin){container.innerHTML='';return;}if(!players.length){container.innerHTML='<p class="muted">Nema dodatih igrača.</p>';return;}container.innerHTML=players.map(p=>`<div class="player-row"><div class="player-info"><strong>${safe(p.name)}</strong><small>${safe(p.league)} liga${hasMatches(p.id)?' · Ima odigrane mečeve':''}</small></div><button class="danger delete-player-btn" data-player-id="${safe(p.id)}" ${hasMatches(p.id)?'disabled title="Igrač ima sačuvane mečeve"':''}>🗑️ Obriši</button></div>`).join('');}
+function renderAdminPlayers(){const container=el('admin-players');if(!isAdmin){container.innerHTML='';return;}if(!players.length){container.innerHTML='<p class="muted">Nema dodatih igrača.</p>';return;}container.innerHTML=players.map(p=>`<div class="player-row"><div class="player-info"><strong>${safe(p.name)}</strong><small>${safe(p.league)} liga${hasMatches(p.id)?' · Ima odigrane mečeve':''}</small></div><button class="danger delete-player-btn" data-player-id="${safe(p.id)}">🗑️ Obriši</button></div>`).join('');}
 async function load(){if(!db){showMessage('Supabase biblioteka nije učitana.',true);return;}try{const [pr,mr]=await Promise.all([db.from('players').select('*'),db.from('matches').select('*')]);if(pr.error||mr.error){showMessage('Greška pri čitanju baze: '+(pr.error?.message||mr.error?.message),true);return;}players=pr.data||[];matches=mr.data||[];render();showMessage('Podaci učitani iz baze.');}catch(error){showMessage('Greška: '+error.message,true);}}
 document.querySelectorAll('[data-tab]').forEach(button=>button.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b===button));document.querySelectorAll('main section').forEach(section=>section.classList.add('hidden'));el(button.dataset.tab).classList.remove('hidden');});
 document.querySelectorAll('[data-league]').forEach(button=>button.onclick=()=>{league=button.dataset.league;document.querySelectorAll('[data-league]').forEach(b=>b.classList.toggle('active',b===button));render();});
@@ -53,7 +53,29 @@ async function authState(){if(!db)return;isAdmin=false;try{const {data,error:aut
 el('login-btn').onclick=async()=>{if(!db)return;const button=el('login-btn');button.disabled=true;try{const {error}=await db.auth.signInWithPassword({email:el('email').value.trim(),password:el('password').value});el('password').value='';if(error){adminMessage('Greška prijave: '+error.message,true);return;}await authState();}catch(error){adminMessage('Greška: '+error.message,true);}finally{button.disabled=false;}};
 el('logout-btn').onclick=async()=>{if(!db)return;const {error}=await db.auth.signOut();if(error){adminMessage('Greška odjave: '+error.message,true);return;}await authState();};
 el('add-player-btn').onclick=async()=>{if(!db||!isAdmin)return;const name=el('new-player').value.trim(),playerLeague=el('new-league').value;if(!name){adminMessage('Unesi ime igrača.',true);return;}const button=el('add-player-btn');button.disabled=true;try{const {error}=await db.from('players').insert({name,league:playerLeague});if(error){adminMessage('Greška pri dodavanju igrača: '+error.message,true);return;}el('new-player').value='';await load();adminMessage('Igrač je uspešno dodat!');}catch(error){adminMessage('Greška: '+error.message,true);}finally{button.disabled=false;}};
-el('admin-players').addEventListener('click',async event=>{const button=event.target.closest('.delete-player-btn');if(!button||!isAdmin||!db)return;const id=button.dataset.playerId,player=players.find(p=>String(p.id)===id);if(!player)return;if(hasMatches(id)){adminMessage('Igrač ima sačuvane mečeve. Brisanje je blokirano radi zaštite rezultata.',true);return;}if(!window.confirm('Da li sigurno želiš da obrišeš igrača "'+player.name+'"?\n\nOva radnja se ne može poništiti.'))return;button.disabled=true;try{const {data:related,error:checkError}=await db.from('matches').select('id').or(`player1_id.eq.${id},player2_id.eq.${id}`).limit(1);if(checkError){adminMessage('Greška pri proveri mečeva: '+checkError.message,true);return;}if(related?.length){adminMessage('Igrač ima sačuvane mečeve i ne može biti obrisan.',true);await load();return;}const {data:deleted,error}=await db.from('players').delete().eq('id',id).select('id');if(error){adminMessage('Greška pri brisanju igrača: '+error.message,true);return;}if(!deleted?.length){adminMessage('Igrač nije obrisan. Proveri administratorske dozvole.',true);return;}await load();adminMessage('Igrač "'+player.name+'" je uspešno obrisan!');}catch(error){adminMessage('Greška: '+error.message,true);}finally{button.disabled=false;}});
+el('admin-players').addEventListener('click',async event=>{
+ const button=event.target.closest('.delete-player-btn');
+ if(!button||!isAdmin||!db)return;
+ const id=button.dataset.playerId;
+ const player=players.find(p=>String(p.id)===id);
+ if(!player)return;
+ const count=matches.filter(m=>String(m.player1_id)===id||String(m.player2_id)===id).length;
+ const warning=count?`\n\nBiće obrisano i ${count} mečeva ovog igrača, a tabela i bodovi će se preračunati.`:'';
+ if(!window.confirm(`Da li sigurno želiš da obrišeš igrača "${player.name}"?${warning}\n\nOva radnja se ne može poništiti.`))return;
+ button.disabled=true;
+ try{
+   if(count){
+     const {error:matchError}=await db.from('matches').delete().or(`player1_id.eq.${id},player2_id.eq.${id}`);
+     if(matchError){adminMessage('Nije moguće obrisati mečeve: '+matchError.message,true);return;}
+   }
+   const {data:deleted,error}=await db.from('players').delete().eq('id',id).select('id');
+   if(error){adminMessage('Greška pri brisanju igrača: '+error.message,true);await load();return;}
+   if(!deleted?.length){adminMessage('Igrač nije obrisan. Proveri administratorske dozvole.',true);return;}
+   await load();
+   adminMessage(`Igrač "${player.name}" i ${count} njegovih mečeva uspešno su obrisani.`);
+ }catch(error){adminMessage('Greška: '+error.message,true);}
+ finally{button.disabled=false;}
+});
 el('save-btn').onclick=async()=>{if(!db||!isAdmin)return;const a=el('p1').value,b=el('p2').value,raw1=el('s1').value.trim(),raw2=el('s2').value.trim(),s1=Number(raw1),s2=Number(raw2);if(!a||!b||a===b||raw1===''||raw2===''||!Number.isInteger(s1)||!Number.isInteger(s2)||s1<0||s2<0||s1>5||s2>5||s1===s2){adminMessage('Izaberi dva različita igrača i ispravan rezultat.',true);return;}const pa=players.find(p=>String(p.id)===a),pb=players.find(p=>String(p.id)===b);if(!pa||!pb||pa.league!==pb.league){adminMessage('Igrači moraju biti iz iste lige.',true);return;}const button=el('save-btn');button.disabled=true;try{const {error}=await db.from('matches').insert({player1_id:a,player2_id:b,league:pa.league,sets1:s1,sets2:s2});if(error){adminMessage('Greška pri čuvanju meča: '+error.message,true);return;}await load();adminMessage('Meč je uspešno sačuvan!');}catch(error){adminMessage('Greška: '+error.message,true);}finally{button.disabled=false;}};
 async function start(){await load();await authState();}start();
 </script>
