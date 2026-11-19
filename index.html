@@ -12,7 +12,7 @@
 <header><div class="wrap"><div class="eyebrow">🎾 TENISKA LIGA</div><h1>TK Sirmium</h1><p>Rezultati, mečevi i tabele na jednom mestu.</p><nav><button class="active" data-tab="standings">🏆 Tabela</button><button data-tab="matches">🎾 Mečevi</button><button data-tab="players">👥 Igrači</button><button data-tab="admin">🔐 Admin</button></nav></div></header>
 <main class="wrap">
 <div id="status" class="notice"></div>
-<section id="standings" class="panel"><h2>🏆 Tabela lige</h2><nav><button class="active" data-league="A">A liga</button><button data-league="B">B liga</button></nav><div class="scroll"><table><thead><tr><th>#</th><th>Igrač</th><th>Odigrano</th><th>Pobede</th><th>Porazi</th></tr></thead><tbody id="standings-body"></tbody></table></div></section>
+<section id="standings" class="panel"><h2>🏆 Tabela lige</h2><nav><button class="active" data-league="A">A liga</button><button data-league="B">B liga</button></nav><div class="scroll"><table><thead><tr><th>#</th><th>Igrač</th><th>Odigrano</th><th>Pobede</th><th>Porazi</th><th>Bodovi</th></tr></thead><tbody id="standings-body"></tbody></table></div></section>
 <section id="matches" class="panel hidden"><h2>🎾 Odigrani mečevi</h2><div id="matches-body"></div></section>
 <section id="players" class="panel hidden"><h2>👥 Igrači</h2><div id="players-body"></div></section>
 <section id="admin" class="panel hidden"><h2>🔐 Administratorski panel</h2>
@@ -38,8 +38,8 @@ const playerName=id=>players.find(p=>String(p.id)===String(id))?.name||'Nepoznat
 const hasMatches=id=>matches.some(m=>String(m.player1_id)===String(id)||String(m.player2_id)===String(id));
 function render(){
  const list=players.filter(p=>p.league===league);
- const stats=list.map(p=>{const own=matches.filter(m=>String(m.player1_id)===String(p.id)||String(m.player2_id)===String(p.id));const wins=own.filter(m=>(String(m.player1_id)===String(p.id)&&Number(m.sets1)>Number(m.sets2))||(String(m.player2_id)===String(p.id)&&Number(m.sets2)>Number(m.sets1))).length;return {...p,played:own.length,wins,losses:own.length-wins};}).sort((a,b)=>b.wins-a.wins||a.losses-b.losses||a.name.localeCompare(b.name));
- el('standings-body').innerHTML=stats.length?stats.map((p,i)=>`<tr><td>${i+1}</td><td>${safe(p.name)}</td><td>${p.played}</td><td>${p.wins}</td><td>${p.losses}</td></tr>`).join(''):'<tr><td colspan="5">Još nema igrača u ovoj ligi.</td></tr>';
+ const stats=list.map(p=>{const own=matches.filter(m=>String(m.player1_id)===String(p.id)||String(m.player2_id)===String(p.id));const wins=own.filter(m=>(String(m.player1_id)===String(p.id)&&Number(m.sets1)>Number(m.sets2))||(String(m.player2_id)===String(p.id)&&Number(m.sets2)>Number(m.sets1))).length;return {...p,played:own.length,wins,losses:own.length-wins,points:wins*2};}).sort((a,b)=>b.points-a.points||b.wins-a.wins||a.losses-b.losses||a.name.localeCompare(b.name));
+ el('standings-body').innerHTML=stats.length?stats.map((p,i)=>`<tr><td>${i+1}</td><td>${safe(p.name)}</td><td>${p.played}</td><td>${p.wins}</td><td>${p.losses}</td><td><strong>${p.points}</strong></td></tr>`).join(''):'<tr><td colspan="6">Još nema igrača u ovoj ligi.</td></tr>';
  el('players-body').innerHTML=players.length?players.map(p=>`<div class="match"><strong>${safe(p.name)}</strong><span class="muted">${safe(p.league)} liga</span></div>`).join(''):'<p class="muted">Nema unetih igrača.</p>';
  el('matches-body').innerHTML=matches.length?matches.map(m=>`<div class="match"><span>${safe(playerName(m.player1_id))} – ${safe(playerName(m.player2_id))} <span class="muted">(${safe(m.league??'')} liga)</span></span><span class="score">${safe(m.sets1)} : ${safe(m.sets2)}</span></div>`).join(''):'<p class="muted">Nema unetih mečeva.</p>';
  const options=players.map(p=>`<option value="${safe(p.id)}">${safe(p.name)} (${safe(p.league)})</option>`).join('');el('p1').innerHTML=options;el('p2').innerHTML=options;if(players.length>1)el('p2').selectedIndex=1;
